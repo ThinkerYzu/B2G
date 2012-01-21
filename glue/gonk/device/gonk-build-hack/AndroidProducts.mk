@@ -23,3 +23,6 @@ $(shell cp $(TOPDIR)device/gonk-build-hack/apicheck.mk-remove-warning.txt \
 # Build system would build OTA-key for recovery image.  It requires a
 # tool wrote in java.  This variable can stop it.
 TARGET_NO_RECOVERY := true
+
+# Prevent dalvik from being built for host
+WITH_HOST_DALVIK := no

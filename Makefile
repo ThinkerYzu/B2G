@@ -315,3 +315,30 @@ $(ADB):
 
 .PHONY: adb
 adb: $(ADB)
+
+.PHONY: build-jni-list
+build-jni-list: gonk
+	$(call GONK_CMD,$(MAKE) build-jni-list)
+
+.PHONY: find-dependants
+# Find all modules they depend on FIND_MODULE.
+#
+# FIND_MODULE is a variable given by user through command line or
+# environment variable.  For example,
+#
+# 	make FIND_MODULE=libdvm find-dependants
+#
+find-dependants:
+	$(call GONK_CMD,$(MAKE) FIND_MODULE="$(FIND_MODULE)" find-dependants)
+
+.PHONY: find-depends
+# Find all modules that FIND_MODULE depends on.
+#
+# FIND_MODULE is a variable given by user through command line or
+# environment variable.  For example,
+#
+# 	make FIND_MODULE=libdvm find-depends
+#
+find-depends:
+	$(call GONK_CMD,$(MAKE) FIND_MODULE="$(FIND_MODULE)" find-depends)
+
