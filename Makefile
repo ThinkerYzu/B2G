@@ -170,7 +170,7 @@ NOOP := echo > /dev/null
 # $(2): the name of the directory where to put the flag.
 # $(3): the name of the directory where submodules are in.
 define MAKE_CHANGE_FLAG
-MAKE_CHANGE_FLAG-dummy:= $(shell $(call DEP_CHECK,$2/.$(1)-chg,$3,$(NOOP)))
+MAKE_CHANGE_FLAG-dummy:= $(shell mkdir -p $2; $(call DEP_CHECK,$2/.$(1)-chg,$3,$(NOOP)))
 $(eval MAKE_CHANGE_FLAGS.$(1).FLAG_DIR := $2)
 $(eval MAKE_CHANGE_FLAGS.$(1).SUBMODULES_DIR := $3)
 $(eval $(1)_chg := $(2)/.$(1)-chg)
@@ -285,7 +285,7 @@ mrproper:
 	git reset --hard
 
 .PHONY: config-galaxy-s2
-config-galaxy-s2: config-gecko $(FLAGS_DIR)/.galaxy-s2-extract
+config-galaxy-s2: config-gecko $(GONK_PATH)/.galaxy-s2-extract
 	@echo "KERNEL = galaxy-s2" > .config.mk && \
         echo "KERNEL_PATH = ./boot/kernel-android-galaxy-s2" >> .config.mk && \
 	echo "GONK = galaxys2" >> .config.mk && \
@@ -293,12 +293,12 @@ config-galaxy-s2: config-gecko $(FLAGS_DIR)/.galaxy-s2-extract
 	cp -p config/kernel-galaxy-s2 boot/kernel-android-galaxy-s2/.config && \
 	echo OK
 
-$(FLAGS_DIR)/.galaxy-s2-extract:
+$(GONK_PATH)/.galaxy-s2-extract: $(GONK_PATH)/device/samsung/galaxys2/extract-files.sh
 	@cd $(GONK_PATH)/device/samsung/galaxys2/ && \
 	export PATH=$$PATH:$$(dirname $(ADB)) && \
 	echo Extracting binary blobs from device, which should be plugged in! ... && \
 	./extract-files.sh && \
-	touch $(FLAGS_DIR)/.galaxy-s2-extract
+	touch $(GONK_PATH)/.galaxy-s2-extract
 
 .PHONY: config-maguro
 config-maguro: config-gecko
