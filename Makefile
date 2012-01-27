@@ -285,16 +285,20 @@ mrproper:
 	git reset --hard
 
 .PHONY: config-galaxy-s2
-config-galaxy-s2: config-gecko
+config-galaxy-s2: config-gecko $(FLAGS_DIR)/.galaxy-s2-extract
 	@echo "KERNEL = galaxy-s2" > .config.mk && \
         echo "KERNEL_PATH = ./boot/kernel-android-galaxy-s2" >> .config.mk && \
 	echo "GONK = galaxys2" >> .config.mk && \
 	export PATH=$$PATH:$$(dirname $(ADB)) && \
 	cp -p config/kernel-galaxy-s2 boot/kernel-android-galaxy-s2/.config && \
-	cd $(GONK_PATH)/device/samsung/galaxys2/ && \
+	echo OK
+
+$(FLAGS_DIR)/.galaxy-s2-extract:
+	@cd $(GONK_PATH)/device/samsung/galaxys2/ && \
+	export PATH=$$PATH:$$(dirname $(ADB)) && \
 	echo Extracting binary blobs from device, which should be plugged in! ... && \
 	./extract-files.sh && \
-	echo OK
+	touch $(FLAGS_DIR)/.galaxy-s2-extract
 
 .PHONY: config-maguro
 config-maguro: config-gecko
