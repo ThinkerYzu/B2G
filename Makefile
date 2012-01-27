@@ -16,6 +16,7 @@ TOOLCHAIN_PATH = ./glue/gonk/prebuilt/$(TOOLCHAIN_HOST)/toolchain/arm-eabi-4.4.3
 
 GONK_PATH = $(abspath glue/gonk)
 GONK_TARGET ?= full_$(GONK)-eng
+B2G_PATH := $(abspath $(PWD))
 
 # This path includes tools to simulate JDK tools.  Gonk would check
 # version of JDK.  These fake tools do nothing but print out version
@@ -23,12 +24,16 @@ GONK_TARGET ?= full_$(GONK)-eng
 FAKE_JDK_PATH ?= $(abspath $(GONK_PATH)/device/gonk-build-hack/fake-jdk-tools)
 
 define GONK_CMD # $(call GONK_CMD,cmd)
+	SAVED_PATH=$$(pwd) && \
 	cd $(GONK_PATH) && \
 	. build/envsetup.sh && \
 	lunch $(GONK_TARGET) && \
 	export USE_CCACHE="yes" && \
 	export PATH=$$PATH:$(FAKE_JDK_PATH) && \
-	$(1)
+	export B2G_PATH=$(B2G_PATH) && \
+	export GECKO_OBJDIR=$(GECKO_OBJDIR) && \
+	$(1) && \
+	cd $$SAVED_PATH
 endef
 
 GECKO_PATH ?= $(abspath gecko)
@@ -127,7 +132,7 @@ define DEP_CHECK
 endef
 else # STOP_DEPENDENCY_CHECK
 define DEP_CHECK
-($3)
+(SAVED_PATH=$$(pwd) && ($3) && cd $$SAVED_PATH && touch $1)
 endef
 endif # STOP_DEPENDENCY_CHECK
 
@@ -144,6 +149,51 @@ endif
 KERNEL_DIR = boot/kernel-android-$(KERNEL)
 GECKO_OBJDIR = $(GECKO_PATH)/objdir-prof-gonk
 
+NOOP := echo > /dev/null
+
+# Make a flag file for changes of submodules.
+#
+# The flag file is touched for changes of submodules.
+# This function is paired with DO_FOR_FLAG function.
+# If you create a flag with name 'foo', you should define a target and rule
+# as following example:
+#
+# $(foo_done): $(foo_chg)
+#	$(call DO_FOR_FLAG,foo, ... commands for foo ...)
+#
+# The given commands would be called for the change of foo flag.
+# $(foo_done) is a file that would be touch after running all
+# commands.  All targets that depends on given commands should put
+# $(foo_done) in its prerequisite list.
+#
+# $(1): flag name
+# $(2): the name of the directory where to put the flag.
+# $(3): the name of the directory where submodules are in.
+define MAKE_CHANGE_FLAG
+MAKE_CHANGE_FLAG-dummy:= $(shell $(call DEP_CHECK,$2/.$(1)-chg,$3,$(NOOP)))
+$(eval MAKE_CHANGE_FLAGS.$(1).FLAG_DIR := $2)
+$(eval MAKE_CHANGE_FLAGS.$(1).SUBMODULES_DIR := $3)
+$(eval $(1)_chg := $(2)/.$(1)-chg)
+$(eval $(1)_done := $(2)/.$(1)-build-done)
+endef
+
+FLAGS_DIR := $(GONK_PATH)/out
+
+$(call MAKE_CHANGE_FLAG,gecko,$(FLAGS_DIR),$(GECKO_PATH))
+$(call MAKE_CHANGE_FLAG,gonk,$(FLAGS_DIR),glue/gonk)
+$(call MAKE_CHANGE_FLAG,kernel,$(FLAGS_DIR),$(KERNEL_PATH))
+$(call MAKE_CHANGE_FLAG,gaia,$(FLAGS_DIR),gaia)
+
+# Do commands for the change of a flag.
+#
+# $(1): flag name
+# $(2): commands
+define DO_FOR_FLAG
+(rm -f $($(1)_chg) && \
+$(call DEP_CHECK,$($(1)_chg),$(MAKE_CHANGE_FLAGS.$(1).SUBMODULES_DIR),$2) && \
+touch $($(1)_done))
+endef
+
 define GECKO_BUILD_CMD
 	export MAKE_FLAGS=$(MAKE_FLAGS) && \
 	export CONFIGURE_ARGS="$(GECKO_CONFIGURE_ARGS)" && \
@@ -157,24 +207,38 @@ endef
 .PHONY: gecko
 # XXX Hard-coded for prof-android target.  It would also be nice if
 # client.mk understood the |package| target.
-gecko:
-	@$(call DEP_CHECK,$(GECKO_OBJDIR)/.b2g-build-done,$(GECKO_PATH),\
-	$(call GECKO_BUILD_CMD) \
-	)
+gecko: $(gecko_done)
+
+$(gecko_done): $(gecko_chg) $(gonk_done)
+	@$(call DO_FOR_FLAG,gecko, \
+	    echo "Build Gecko ......" && \
+	    $(call GECKO_BUILD_CMD))
+
+$(GECKO_OBJDIR)/dist/b2g.tar.gz: $(gecko_done)
+	@echo "Copy $@ ......" && \
+	cp `ls -t $(GECKO_OBJDIR)/dist/b2g-*.tar.gz | head -n1` $@
+
+gecko-tar: $(GECKO_OBJDIR)/dist/b2g.tar.gz
 
 .PHONY: gonk
-gonk: gaia-hack
-	@$(call DEP_CHECK,$(GONK_PATH)/out/.b2g-build-done,glue/gonk, \
-	    $(call GONK_CMD,$(MAKE) $(MAKE_FLAGS) $(GONK_MAKE_FLAGS)) ; \
+gonk: $(gonk_done)
+
+$(gonk_done): $(gonk_chg) $(gaia_done)
+	@$(call DO_FOR_FLAG,gonk, \
+	    echo "Build gonk ......" && \
+	    $(call GONK_CMD,$(MAKE) $(MAKE_FLAGS) $(GONK_MAKE_FLAGS)) && \
 	    $(if $(filter qemu,$(KERNEL)), \
-		cp $(GONK_PATH)/system/core/rootdir/init.rc.gonk \
-		    $(GONK_PATH)/out/target/product/$(GONK)/root/init.rc))
+	        cp $(GONK_PATH)/system/core/rootdir/init.rc.gonk \
+	            $(GONK_PATH)/out/target/product/$(GONK)/root/init.rc, \
+		$(NOOP)))
 
 .PHONY: kernel
 # XXX Hard-coded for nexuss4g target
 # XXX Hard-coded for gonk tool support
-kernel:
-	@$(call DEP_CHECK,$(KERNEL_PATH)/.b2g-build-done,$(KERNEL_PATH),\
+kernel: $(kernel_done)
+
+$(kernel_done): $(kernel_chg)
+	@$(call DO_FOR_FLAG,kernel,\
 	    $(if $(filter galaxy-s2,$(KERNEL)), \
 		PATH="$$PATH:$(abspath $(TOOLCHAIN_PATH))" \
 		    $(MAKE) -C $(KERNEL_PATH) $(MAKE_FLAGS) ARCH=arm \
@@ -194,16 +258,21 @@ clean: clean-gecko clean-gonk clean-kernel
 
 .PHONY: clean-gecko
 clean-gecko:
-	rm -rf $(GECKO_OBJDIR)
+	@echo "Clean gecko ......"
+	@rm -rf $(GECKO_OBJDIR)
+	@rm -f $(gecko_done)
 
 .PHONY: clean-gonk
 clean-gonk:
+	@echo "Clean gonk ......"
 	@$(call GONK_CMD,$(MAKE) clean)
+	@rm -f $(gonk_done)
 
 .PHONY: clean-kernel
 clean-kernel:
+	@echo "Clean kernel ......"
 	@PATH="$$PATH:$(abspath $(TOOLCHAIN_PATH))" $(MAKE) -C $(KERNEL_PATH) ARCH=arm CROSS_COMPILE=arm-eabi- clean
-	@rm -f $(KERNEL_PATH)/.b2g-build-done
+	@rm -f $(kernel_done)
 
 .PHONY: mrproper
 # NB: this is a VERY DANGEROUS command that will BLOW AWAY ALL
@@ -351,23 +420,27 @@ $(APP_OUT_DIR):
 	mkdir -p $(APP_OUT_DIR)
 
 .PHONY: gecko-install-hack
-gecko-install-hack: gecko
+gecko-install-hack: $(FLAGS_DIR)/.gecko-install-hack
+
+$(FLAGS_DIR)/.gecko-install-hack: $(GECKO_OBJDIR)/dist/b2g.tar.gz
 	rm -rf $(OUT_DIR)/b2g
 	mkdir -p $(OUT_DIR)/lib
 	# Extract the newest tarball in the gecko objdir.
 	( cd $(OUT_DIR) && \
-	  tar xvfz `ls -t $(GECKO_OBJDIR)/dist/b2g-*.tar.gz | head -n1` )
+	  tar xvfz $(GECKO_OBJDIR)/dist/b2g.tar.gz )
 	find $(GONK_PATH)/out -iname "*.img" | xargs rm -f
 	@$(call GONK_CMD,make $(MAKE_FLAGS) $(GONK_MAKE_FLAGS) systemimage-nodeps)
+	touch $@
 
-.PHONY: gaia-hack
-gaia-hack: gaia
-	rm -rf $(OUT_DIR)/home
-	mkdir -p $(OUT_DIR)/home
-	cp -r gaia/* $(OUT_DIR)/home
-	rm -rf $(OUT_DIR)/b2g/defaults/profile
-	mkdir -p $(OUT_DIR)/b2g/defaults
-	cp -r gaia/profile $(OUT_DIR)/b2g/defaults
+$(gaia_done): $(gaia_chg)
+	@$(call DO_FOR_FLAG,gaia, \
+	    echo "Copy gaia ......" && \
+	    rm -rf $(OUT_DIR)/home && \
+	    mkdir -p $(OUT_DIR)/home && \
+	    cp -r gaia/* $(OUT_DIR)/home && \
+	    rm -rf $(OUT_DIR)/b2g/defaults/profile && \
+	    mkdir -p $(OUT_DIR)/b2g/defaults && \
+	    cp -r gaia/profile $(OUT_DIR)/b2g/defaults)
 
 .PHONY: install-gecko
 install-gecko: gecko-install-hack

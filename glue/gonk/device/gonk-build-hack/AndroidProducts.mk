@@ -17,8 +17,11 @@ BUILD_DROIDDOC:= $(GONK_BUILD_HACK)/droiddoc-noop.mk
 # invoke a java tool to check API version.  We delete it to prevent
 # from being loaded.
 $(shell rm -f $(TOPDIR)build/core/tasks/apicheck.mk || exit 1)
-$(shell cp $(TOPDIR)device/gonk-build-hack/apicheck.mk-remove-warning.txt \
-	$(TOPDIR)build/core/tasks/apicheck.mk.removed)
+$(shell \
+    if [ ! -e $(TOPDIR)build/core/tasks/apicheck.mk.removed ]; then \
+        cp $(TOPDIR)device/gonk-build-hack/apicheck.mk-remove-warning.txt \
+	$(TOPDIR)build/core/tasks/apicheck.mk.removed; \
+    fi)
 
 # Build system would build OTA-key for recovery image.  It requires a
 # tool wrote in java.  This variable can stop it.
