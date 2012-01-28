@@ -150,7 +150,7 @@ CCACHE ?= $(shell which ccache)
 ADB := $(abspath glue/gonk/out/host/linux-x86/bin/adb)
 
 .PHONY: build
-build: gecko gecko-install-hack gonk
+build: gonk
 
 ifeq (qemu,$(KERNEL))
 build: kernel bootimg-hack
@@ -239,7 +239,7 @@ gecko-tar: $(GECKO_OBJDIR)/dist/b2g.tar.gz
 .PHONY: gonk
 gonk: $(gonk_done)
 
-$(gonk_done): $(gonk_chg) $(gaia_done) $(gecko_chg)
+$(gonk_done): $(gonk_chg) $(gaia_chg) $(gecko_chg)
 	@$(call DO_FOR_FLAG,gonk, \
 	    echo "Build gonk ......" && \
 	    $(call GONK_CMD,$(MAKE) $(MAKE_FLAGS) $(GONK_MAKE_FLAGS)) && \
@@ -471,6 +471,9 @@ $(gaia_done): $(gaia_chg)
 	    rm -rf $(OUT_DIR)/b2g/defaults/profile && \
 	    mkdir -p $(OUT_DIR)/b2g/defaults && \
 	    cp -r gaia/profile $(OUT_DIR)/b2g/defaults)
+
+.PHONY: gaia-gonk-install
+gaia-gonk-install: $(gaia_done)
 
 .PHONY: install-gecko
 install-gecko: gecko-install-hack $(ADB)

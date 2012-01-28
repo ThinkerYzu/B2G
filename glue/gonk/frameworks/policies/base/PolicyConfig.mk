@@ -81,4 +81,4 @@ $(foreach p, $(ALL_PRODUCTS), \
 #  - ALL_DEFAULT_INSTALLED_MODULES passed from glue/gonk/build/core/main.mk,
 #  - requiste list of "systemimage" target.
 # 
-ALL_DEFAULT_INSTALLED_MODULES += gecko-gonk
+ALL_DEFAULT_INSTALLED_MODULES += gecko-gonk gaia-gonk

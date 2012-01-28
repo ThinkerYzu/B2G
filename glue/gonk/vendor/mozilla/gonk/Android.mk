@@ -19,3 +19,22 @@ $(LOCAL_BUILT_MODULE): $(OUT_DIR)/.gecko-chg
 	$(hide) $(MAKE) -C $(B2G_PATH) gecko-gonk-install && \
 	mkdir -p $$(dirname $@) && \
 	touch $@
+
+############################################################
+# Integrate Gaia to the building process of gonk.
+############################################################
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := gaia-gonk
+LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_MODULE_PATH := $(TARGET_OUT)/home
+LOCAL_MODULE_TAGS := optional
+
+#######################################
+include $(BUILD_SYSTEM)/base_rules.mk
+#######################################
+
+$(LOCAL_BUILT_MODULE): $(OUT_DIR)/.gaia-chg
+	$(hide) $(MAKE) -C $(B2G_PATH) gaia-gonk-install && \
+	mkdir -p $$(dirname $@) && \
+	touch $@
