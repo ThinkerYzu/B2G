@@ -209,7 +209,13 @@ endef
 # client.mk understood the |package| target.
 gecko: $(gecko_done)
 
-$(gecko_done): $(gecko_chg) $(gonk_done)
+$(gecko_done): $(gecko_chg)
+	@$(call DO_FOR_FLAG,gecko, \
+	    echo "Build Gecko ......" && \
+	    $(call GECKO_BUILD_CMD))
+
+.PHONY: gecko-gonk-internal
+gecko-gonk-internal:
 	@$(call DO_FOR_FLAG,gecko, \
 	    echo "Build Gecko ......" && \
 	    $(call GECKO_BUILD_CMD))
@@ -223,7 +229,7 @@ gecko-tar: $(GECKO_OBJDIR)/dist/b2g.tar.gz
 .PHONY: gonk
 gonk: $(gonk_done)
 
-$(gonk_done): $(gonk_chg) $(gaia_done)
+$(gonk_done): $(gonk_chg) $(gaia_done) $(gecko_chg)
 	@$(call DO_FOR_FLAG,gonk, \
 	    echo "Build gonk ......" && \
 	    $(call GONK_CMD,$(MAKE) $(MAKE_FLAGS) $(GONK_MAKE_FLAGS)) && \
@@ -425,15 +431,25 @@ $(APP_OUT_DIR):
 
 .PHONY: gecko-install-hack
 gecko-install-hack: $(FLAGS_DIR)/.gecko-install-hack
+	find $(GONK_PATH)/out -iname "*.img" | xargs rm -f
+	@$(call GONK_CMD,make $(MAKE_FLAGS) $(GONK_MAKE_FLAGS) systemimage-nodeps)
+
+#
+# gecko-gonk-install is called by building system of gonk to build
+# gecko and to make it as a module of gonk.
+#
+# Check glue/gonk/vendor/mozilla/gonk/Android.mk for more information.
+#
+.PHONY: gecko-gonk-install
+gecko-gonk-install: $(FLAGS_DIR)/.gecko-install-hack
 
 $(FLAGS_DIR)/.gecko-install-hack: $(GECKO_OBJDIR)/dist/b2g.tar.gz
+	echo "Install Gecko ......"
 	rm -rf $(OUT_DIR)/b2g
 	mkdir -p $(OUT_DIR)/lib
 	# Extract the newest tarball in the gecko objdir.
 	( cd $(OUT_DIR) && \
 	  tar xvfz $(GECKO_OBJDIR)/dist/b2g.tar.gz )
-	find $(GONK_PATH)/out -iname "*.img" | xargs rm -f
-	@$(call GONK_CMD,make $(MAKE_FLAGS) $(GONK_MAKE_FLAGS) systemimage-nodeps)
 	touch $@
 
 $(gaia_done): $(gaia_chg)

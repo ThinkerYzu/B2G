@@ -68,3 +68,17 @@ $(foreach p, $(ALL_PRODUCTS), \
 	$(eval PRODUCTS.$(p).PRODUCT_PACKAGES := \
 		$(filter-out $(REMOVE_MODULES), \
 			$(PRODUCTS.$(p).PRODUCT_PACKAGES))))
+
+# This variable make systemimage depending on gecko-gonk module defined
+# in glue/gonk/vendor/mozilla/gonk/Android.mk.  Without this variable,
+# system image would not be rebuilt for changes of Gecko.
+#
+# See definitions in glue/gonk/build/core/main.mk for
+#  - Default_MODULES, and
+#  - modules_to_install.
+#
+# See definitions in glue/gonk/build/core/Makefile for
+#  - ALL_DEFAULT_INSTALLED_MODULES passed from glue/gonk/build/core/main.mk,
+#  - requiste list of "systemimage" target.
+# 
+ALL_DEFAULT_INSTALLED_MODULES += gecko-gonk
