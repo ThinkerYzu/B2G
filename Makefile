@@ -224,12 +224,6 @@ $(gecko_done): $(gecko_chg)
 	    echo "Build Gecko ......" && \
 	    $(call GECKO_BUILD_CMD))
 
-.PHONY: gecko-gonk-internal
-gecko-gonk-internal:
-	@$(call DO_FOR_FLAG,gecko, \
-	    echo "Build Gecko ......" && \
-	    $(call GECKO_BUILD_CMD))
-
 $(GECKO_OBJDIR)/dist/b2g.tar.gz: $(gecko_done)
 	@echo "Copy $@ ......" && \
 	cp `ls -t $(GECKO_OBJDIR)/dist/b2g-*.tar.gz | head -n1` $@
@@ -472,6 +466,7 @@ $(gaia_done): $(gaia_chg)
 	    mkdir -p $(OUT_DIR)/b2g/defaults && \
 	    cp -r gaia/profile $(OUT_DIR)/b2g/defaults)
 
+# Called by gaia-gonk module in glue/gonk/vendor/mozilla/gonk/Android.mk.
 .PHONY: gaia-gonk-install
 gaia-gonk-install: $(gaia_done)
 
