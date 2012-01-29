@@ -319,6 +319,12 @@ config-galaxy-s2: clean-flags
 	cp -p config/kernel-galaxy-s2 boot/kernel-android-galaxy-s2/.config && \
 	echo OK
 
+# Force to extract blobs from a galaxy s2 device.
+.PHONY: extract-galaxy-s2
+extract-galaxy-s2:
+	@rm -f $(GONK_PATH)/.galaxy-s2-extract &&
+	$(MAKE) $(GONK_PATH)/.galaxy-s2-extract
+
 $(GONK_PATH)/.galaxy-s2-extract: $(GONK_PATH)/device/samsung/galaxys2/extract-files.sh
 	@cd $(GONK_PATH)/device/samsung/galaxys2/ && \
 	export PATH=$$PATH:$$(dirname $(ADB)) && \
