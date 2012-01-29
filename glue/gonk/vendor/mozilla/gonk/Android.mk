@@ -14,6 +14,9 @@ LOCAL_MODULE_TAGS := optional
 include $(BUILD_SYSTEM)/base_rules.mk
 #######################################
 
+# XXX: Add all modules depended by gecko here.  This list is not
+# complete.  Add all ncessary modules if you find some ones been
+# missed.
 $(LOCAL_BUILT_MODULE): libc libstdc++ libm libdl libthread_db
 $(LOCAL_BUILT_MODULE): $(OUT_DIR)/.gecko-chg
 	$(hide) $(MAKE) -C $(B2G_PATH) gecko-gonk-install && \
