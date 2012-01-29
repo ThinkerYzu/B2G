@@ -251,11 +251,7 @@ gonk: $(gonk_done)
 $(gonk_done): $(gonk_chg) $(gaia_chg) $(gecko_chg)
 	@$(call DO_FOR_FLAG,gonk, \
 	    echo "Build gonk ......" && \
-	    $(call GONK_CMD,$(MAKE) $(MAKE_FLAGS) $(GONK_MAKE_FLAGS)) && \
-	    $(if $(filter qemu,$(KERNEL)), \
-	        cp $(GONK_PATH)/system/core/rootdir/init.rc.gonk \
-	            $(GONK_PATH)/out/target/product/$(GONK)/root/init.rc, \
-		$(NOOP)))
+	    $(call GONK_CMD,$(MAKE) $(MAKE_FLAGS) $(GONK_MAKE_FLAGS)))
 
 .PHONY: kernel
 # XXX Hard-coded for nexuss4g target
