@@ -26,3 +26,9 @@ $(shell \
 # Build system would build OTA-key for recovery image.  It requires a
 # tool wrote in java.  This variable can stop it.
 TARGET_NO_RECOVERY := true
+
+# Prevent glue/gonk/system/core/rootdir/Android.mk from installing
+# glue/gonk/system/core/rootdir/init.rc.
+#
+# See also glue/gonk/vendor/mozilla/gonk/Android.mk.
+TARGET_PROVIDES_INIT_RC := true

@@ -41,3 +41,15 @@ $(LOCAL_BUILT_MODULE): $(OUT_DIR)/.gaia-chg
 	$(hide) $(MAKE) -C $(B2G_PATH) gaia-gonk-install && \
 	mkdir -p $$(dirname $@) && \
 	touch $@
+
+
+# Use glue/gonk/system/core/rootdir/init.rc.gonk instead of
+# glue/gonk/system/core/rootdir/init.rc.
+#
+# See the rules in glue/gonk/system/core/rootdir/Android.mk for copying
+# init.rc to initrd. (search TARGET_PROVIDES_INIT_RC)
+file := $(TARGET_ROOT_OUT)/init.rc
+$(file) : $(TOPDIR)system/core/rootdir/init.rc.gonk | $(ACP)
+	$(transform-prebuilt-to-target)
+ALL_PREBUILT += $(file)
+$(INSTALLED_RAMDISK_TARGET): $(file)
