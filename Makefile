@@ -16,6 +16,8 @@ TOOLCHAIN_PATH = ./glue/gonk/prebuilt/$(TOOLCHAIN_HOST)/toolchain/arm-eabi-4.4.3
 
 GONK_PATH = $(abspath glue/gonk)
 
+TEST_DIRS = $(abspath gaia/tests) $(abspath marionette/marionette/tests/unit-tests.ini)
+
 # We need adb for config-* targets.  Adb is built by building system
 # of gonk that needs a correct product name provided by "GONK_TARGET".
 # But, "GONK_TARGET" is not set properly before running any config-*
@@ -122,7 +124,7 @@ ifeq ($(strip $(STOP_DEPENDENCY_CHECK)),false)
 define DEP_CHECK
 	(echo -n "Checking dependency for $2 ..."; \
 	if [ -e "$1" ]; then \
-		LAST_HASH="`cat $1`"; \
+		LAST_HASH="$$(cat $1)"; \
 		CUR_HASH=$$($(call DEP_HASH,$2)); \
 		if [ "$$LAST_HASH" = "$$CUR_HASH" ]; then \
 			echo " (skip)"; \
@@ -145,7 +147,8 @@ CCACHE ?= $(shell which ccache)
 ADB := $(abspath glue/gonk/out/host/linux-x86/bin/adb)
 
 .PHONY: build
-build: gecko gecko-install-hack gonk
+build: gecko-install-hack
+	$(MAKE) gonk
 
 ifeq (qemu,$(KERNEL))
 build: kernel bootimg-hack
@@ -227,7 +230,7 @@ mrproper:
 	git reset --hard
 
 .PHONY: config-galaxy-s2
-config-galaxy-s2: config-gecko $(ADB)
+config-galaxy-s2: config-gecko adb-check-version
 	@echo "KERNEL = galaxy-s2" > .config.mk && \
         echo "KERNEL_PATH = ./boot/kernel-android-galaxy-s2" >> .config.mk && \
 	echo "GONK = galaxys2" >> .config.mk && \
@@ -239,11 +242,22 @@ config-galaxy-s2: config-gecko $(ADB)
 	echo OK
 
 .PHONY: config-maguro
-config-maguro: config-gecko
+config-maguro: config-gecko adb-check-version
 	@echo "KERNEL = msm" > .config.mk && \
         echo "KERNEL_PATH = ./boot/msm" >> .config.mk && \
 	echo "GONK = maguro" >> .config.mk && \
+	export PATH=$$PATH:$$(dirname $(ADB)) && \
 	cd $(GONK_PATH)/device/toro/maguro && \
+	echo Extracting binary blobs from device, which should be plugged in! ... && \
+	./extract-files.sh && \
+	echo OK
+
+.PHONY: config-akami
+config-akami: config-gecko
+	@echo "KERNEL = msm" > .config.mk && \
+        echo "KERNEL_PATH = ./boot/msm" >> .config.mk && \
+	echo "GONK = akami" >> .config.mk && \
+	cd $(GONK_PATH)/device/toro/akami && \
 	echo Extracting binary blobs from device, which should be plugged in! ... && \
 	./extract-files.sh && \
 	echo OK
@@ -305,11 +319,11 @@ flash: flash-$(GONK)
 flash-only: flash-only-$(GONK)
 
 .PHONY: flash-crespo4g
-flash-crespo4g: image $(ADB)
+flash-crespo4g: image adb-check-version
 	@$(call GONK_CMD,$(ADB) reboot bootloader && fastboot flashall -w)
 
 .PHONY: flash-only-crespo4g
-flash-only-crespo4g: $(ADB)
+flash-only-crespo4g: adb-check-version
 	@$(call GONK_CMD,$(ADB) reboot bootloader && fastboot flashall -w)
 
 define FLASH_GALAXYS2_CMD
@@ -320,23 +334,32 @@ $(FLASH_GALAXYS2_CMD_CHMOD_HACK)
 endef
 
 .PHONY: flash-galaxys2
-flash-galaxys2: image $(ADB)
+flash-galaxys2: image adb-check-version
 	$(FLASH_GALAXYS2_CMD)
 
 .PHONY: flash-only-galaxys2
-flash-only-galaxys2: $(ADB)
+flash-only-galaxys2: adb-check-version
 	$(FLASH_GALAXYS2_CMD)
 
 .PHONY: flash-maguro
 flash-maguro: image flash-only-maguro
 
 .PHONY: flash-only-maguro
-flash-only-maguro:
+flash-only-maguro: flash-only-toro
+
+.PHONY: flash-akami
+flash-akami: image flash-only-akami
+
+.PHONY: flash-only-akami
+flash-only-akami: flash-only-toro
+
+.PHONY: flash-only-toro
+flash-only-toro:
 	@$(call GONK_CMD, \
 	adb reboot bootloader && \
 	$(FASTBOOT) devices && \
 	$(FASTBOOT) erase userdata && \
-	$(FASTBOOT) flash userdata ./out/target/product/maguro/userdata.img && \
+	$(FASTBOOT) flash userdata ./out/target/product/$(GONK)/userdata.img && \
 	$(FASTBOOT) flashall)
 
 .PHONY: bootimg-hack
@@ -356,6 +379,7 @@ kernel-%:
 	@
 
 OUT_DIR := $(GONK_PATH)/out/target/product/$(GONK)/system
+DATA_OUT_DIR := $(GONK_PATH)/out/target/product/$(GONK)/data
 APP_OUT_DIR := $(OUT_DIR)/app
 
 $(APP_OUT_DIR):
@@ -367,9 +391,9 @@ gecko-install-hack: gecko
 	mkdir -p $(OUT_DIR)/lib
 	# Extract the newest tarball in the gecko objdir.
 	( cd $(OUT_DIR) && \
-	  tar xvfz `ls -t $(GECKO_OBJDIR)/dist/b2g-*.tar.gz | head -n1` )
+	  tar xvfz $$(ls -t $(GECKO_OBJDIR)/dist/b2g-*.tar.gz | head -n1) )
 	find $(GONK_PATH)/out -iname "*.img" | xargs rm -f
-	@$(call GONK_CMD,make $(MAKE_FLAGS) $(GONK_MAKE_FLAGS) systemimage-nodeps)
+	@$(call GONK_CMD,$(MAKE) $(MAKE_FLAGS) $(GONK_MAKE_FLAGS) systemimage-nodeps)
 
 .PHONY: gaia-hack
 gaia-hack: gaia
@@ -381,37 +405,42 @@ gaia-hack: gaia
 	cp -r gaia/profile $(OUT_DIR)/b2g/defaults
 
 .PHONY: install-gecko
-install-gecko: gecko-install-hack $(ADB)
-	@$(ADB) shell mount -o remount,rw /system && \
+install-gecko: gecko-install-hack adb-check-version
+	$(ADB) remount
+	$(ADB) push $(OUT_DIR)/b2g /system/b2g
+
+.PHONY: install-gecko-only
+install-gecko-only:
+	$(ADB) remount
 	$(ADB) push $(OUT_DIR)/b2g /system/b2g
 
 # The sad hacks keep piling up...  We can't set this up to be
 # installed as part of the data partition because we can't flash that
 # on the sgs2.
-PROFILE := `$(ADB) shell ls -d /data/b2g/mozilla/*.default | tr -d '\r'`
+PROFILE := $$($(ADB) shell ls -d /data/b2g/mozilla/*.default | tr -d '\r')
 PROFILE_DATA := gaia/profile
 .PHONY: install-gaia
-install-gaia: $(ADB)
-	@for file in `ls $(PROFILE_DATA)`; \
+install-gaia: adb-check-version
+	@for file in $$(ls $(PROFILE_DATA)); \
 	do \
 		data=$${file##*/}; \
 		echo Copying $$data; \
 		$(ADB) shell rm -r $(PROFILE)/$$data; \
 		$(ADB) push gaia/profile/$$data $(PROFILE)/$$data; \
 	done
-	@for i in `ls gaia`; do $(ADB) push gaia/$$i /data/local/$$i; done
+	@for i in $$(ls gaia); do $(ADB) push gaia/$$i /data/local/$$i; done
 
 .PHONY: image
 image: build
 	@echo XXX stop overwriting the prebuilt nexuss4g kernel
 
 .PHONY: unlock-bootloader
-unlock-bootloader: $(ADB)
+unlock-bootloader: adb-check-version
 	@$(call GONK_CMD,$(ADB) reboot bootloader && fastboot oem unlock)
 
 # Kill the b2g process on the device.
 .PHONY: kill-b2g
-kill-b2g: $(ADB)
+kill-b2g: adb-check-version
 	$(ADB) shell killall b2g
 
 .PHONY: sync
@@ -436,7 +465,23 @@ package:
 	cd $(PKG_DIR) && tar -czvf qemu_package.tar.gz qemu gaia
 
 $(ADB):
-	@$(call GONK_CMD,make adb)
+	@$(call GONK_CMD,$(MAKE) adb)
 
 .PHONY: adb
 adb: $(ADB)
+
+# Make sure running right version of adb server.
+#
+# Adb will write some noise to stdout while running server of
+# different version.  It make rules that depend on output of adb going
+# wrong.  adb start-server before doing anything can prevent it.  adb
+# start-server will kill current adb server and start a new instance
+# if version numbers are not matched.
+.PHONY: adb-check-version
+adb-check-version: $(ADB)
+	$(ADB) start-server
+
+.PHONY: test
+test:
+	cd marionette/marionette && \
+	sh venv_test.sh `which python` --emulator --homedir=$(abspath .) --type=b2g $(TEST_DIRS)

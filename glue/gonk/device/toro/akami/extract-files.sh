@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-DEVICE=maguro
+DEVICE=akami
 COMMON=common
 MANUFACTURER=toro
 
@@ -40,7 +40,7 @@ do
     mkdir -p $PROPRIETARY_COMMON_DIR/$NAME
 done
 
-# maguro
+# akami
 
 # common
 (cat << EOF) | sed s/__DEVICE__/$DEVICE/g | sed s/__MANUFACTURER__/$MANUFACTURER/g > ../../../vendor/$MANUFACTURER/$DEVICE/$DEVICE-vendor-blobs.mk
