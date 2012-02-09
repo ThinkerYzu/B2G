@@ -159,6 +159,7 @@ define GECKO_BUILD_CMD
 	export CONFIGURE_ARGS="$(GECKO_CONFIGURE_ARGS)" && \
 	export GONK_PRODUCT="$(GONK)" && \
 	export GONK_PATH="$(GONK_PATH)" && \
+	export PATH=$$PATH:$(FAKE_JDK_PATH) && \
 	ulimit -n 4096 && \
 	$(MAKE) -C $(GECKO_PATH) -f client.mk -s $(MAKE_FLAGS) && \
 	$(MAKE) -C $(GECKO_OBJDIR) package
